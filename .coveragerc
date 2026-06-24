@@ -1,8 +1,9 @@
 [run]
 source = custom_components/navien_navilink_wh
 omit =
-    # Vendored upstream NaviLink AWS-IoT client (third-party transport code).
-    custom_components/navien_navilink_wh/navien_api.py
+    # MQTT-over-WebSocket transport: paho socket-pump / live-broker bound.
+    # Validated end-to-end against the live NaviLink broker, not in unit tests.
+    custom_components/navien_navilink_wh/navilink/transport.py
 
 [report]
 exclude_also =

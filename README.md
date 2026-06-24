@@ -64,7 +64,8 @@ system (°F + gal/min, or °C + L/min) and Home Assistant converts as needed.
 - Home Assistant `2024.12.0` or newer.
 - A NaviLink account (the same username/password used in the NaviLink mobile
   app).
-- `AWSIoTPythonSDK` — installed automatically from the manifest.
+- `paho-mqtt` — installed automatically from the manifest (Home Assistant
+  already bundles it).
 
 ## Installation
 
@@ -202,18 +203,29 @@ custom_components/navien_navilink_wh/
 ├── __init__.py        # setup/unload, runtime_data, platform forwarding
 ├── coordinator.py     # DataUpdateCoordinator[NavienData]; push client → typed snapshot
 ├── entity.py          # NavienChannelEntity base (CoordinatorEntity, device_info, availability)
-├── config_flow.py     # user + gateway steps, reauth, options flow
+├── config_flow.py     # user + gateway steps, reauth, reconfigure, options flow
 ├── water_heater.py    # WaterHeaterEntity (primary entity) per channel
 ├── switch.py          # power + on-demand switches (EntityDescription + value_fn)
-├── sensor.py          # temp / flow / gas / diagnostics sensors (EntityDescription)
-├── binary_sensor.py   # fault (problem) + freeze-protection
+├── sensor.py          # temps / flow / gas / diagnostics (capability-gated EntityDescription)
+├── binary_sensor.py   # fault (problem), freeze-protection, cloud connection
 ├── diagnostics.py     # redacted diagnostics
 ├── strings.json       # config + entity translations
 ├── icons.json         # entity icon translations
-└── navien_api.py      # NaviLink AWS IoT client (vendored; root CA via certifi)
+└── navilink/          # native NaviLink client (our own — no third-party AWS SDK)
+    ├── sigv4.py        #   AWS SigV4 presigned-URL signing (stdlib only)
+    ├── auth.py         #   REST sign-in + device list (injected aiohttp session)
+    ├── protocol.py     #   topics, command codes, message envelopes
+    ├── models.py       #   enums, exceptions, value scaling
+    ├── transport.py    #   MQTT-over-WebSocket via paho on an asyncio socket-pump
+    └── client.py       #   orchestration: channels, control, push updates, reconnect
 ```
 
-Targeting Home Assistant [Integration Quality Scale](https://developers.home-assistant.io/docs/core/integration-quality-scale/) **gold** — see `docs/_research/2026-06-23_quality-scale-upgrade.md`.
+The `navilink/` package is a self-contained, asyncio-native client written for
+this integration — it signs the AWS-IoT WebSocket URL itself (no `boto3` /
+`AWSIoTPythonSDK`) and drives `paho-mqtt` on the event loop with no background
+network thread. REST uses Home Assistant's shared aiohttp session.
+
+Targeting Home Assistant [Integration Quality Scale](https://developers.home-assistant.io/docs/core/integration-quality-scale/) **gold** (async-dependency + inject-websession also met) — see `docs/_research/2026-06-23_quality-scale-upgrade.md`.
 
 ## Credits
 

@@ -17,19 +17,19 @@ from custom_components.navien_navilink_wh.const import (
     DOMAIN,
 )
 
-from .conftest import DEVICE_LIST, ENTRY_DATA, MockNavilink
+from .conftest import DEVICE_LIST, ENTRY_DATA, MockNavilinkClient
 
 CREDS = {CONF_USERNAME: "user@example.com", CONF_PASSWORD: "secret"}
-CF = "custom_components.navien_navilink_wh.config_flow.NavilinkConnect"
+CF = "custom_components.navien_navilink_wh.config_flow.NavilinkClient"
 
 
-class _BadLogin(MockNavilink):
-    async def login(self):
+class _BadLogin(MockNavilinkClient):
+    async def async_login(self):
         raise RuntimeError("invalid")
 
 
-class _OtherGateway(MockNavilink):
-    async def login(self):
+class _OtherGateway(MockNavilinkClient):
+    async def async_login(self):
         return [
             {"deviceInfo": {**DEVICE_LIST[0]["deviceInfo"], "macAddress": "ZZ9988776655"}}
         ]
@@ -52,6 +52,7 @@ async def test_user_flow_success(hass: HomeAssistant, mock_navilink) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_USERNAME] == "user@example.com"
     assert result["options"][CONF_POLLING_INTERVAL] == 15
+    await hass.async_block_till_done()
 
 
 async def test_user_flow_invalid_auth_then_recover(
@@ -74,6 +75,7 @@ async def test_user_flow_invalid_auth_then_recover(
         result["flow_id"], {CONF_DEVICE_INDEX: 0}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
 
 
 async def test_user_flow_already_configured(

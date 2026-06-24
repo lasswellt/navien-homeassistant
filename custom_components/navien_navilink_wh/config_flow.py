@@ -11,7 +11,8 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_DEVICE_INDEX,
@@ -24,7 +25,7 @@ from .const import (
     MAX_POLLING_INTERVAL,
     MIN_POLLING_INTERVAL,
 )
-from .navien_api import NavilinkConnect
+from .navilink import NavilinkClient
 
 STEP_USER_SCHEMA = vol.Schema(
     {
@@ -39,11 +40,13 @@ POLLING_SELECTOR = vol.All(
 
 
 async def _validate_credentials(
-    username: str, password: str
+    hass: HomeAssistant, username: str, password: str
 ) -> list[dict[str, Any]]:
     """Return the NaviLink device list, raising on bad credentials."""
-    navien = NavilinkConnect(username, password, polling_interval=0)
-    return await navien.login()
+    client = NavilinkClient(
+        username, password, session=async_get_clientsession(hass)
+    )
+    return await client.async_login()
 
 
 def _gateway_choices(device_info: list[dict[str, Any]]) -> dict[int, str]:
@@ -83,7 +86,7 @@ class NavienConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 self._device_info = await _validate_credentials(
-                    user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+                    self.hass, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
                 )
             except Exception:  # noqa: BLE001 — any failure is auth/connection
                 errors["base"] = "invalid_auth"
@@ -147,7 +150,7 @@ class NavienConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 await _validate_credentials(
-                    user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+                    self.hass, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
                 )
             except Exception:  # noqa: BLE001
                 errors["base"] = "invalid_auth"
@@ -187,7 +190,7 @@ class NavienConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 self._device_info = await _validate_credentials(
-                    user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+                    self.hass, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
                 )
             except Exception:  # noqa: BLE001
                 errors["base"] = "invalid_auth"

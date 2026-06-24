@@ -28,7 +28,11 @@ DEVICE_LIST = [
             "homeSeq": "1",
             "deviceType": 1,
             "additionalValue": "AV",
-        }
+        },
+        "descaling": {
+            "descalingStartTime": "2026-06-01T00:00:00",
+            "descalingEndTime": "2027-06-01T00:00:00",
+        },
     }
 ]
 
@@ -69,6 +73,8 @@ CHANNEL_STATUS = {
     },
 }
 
+DEVICE_STATUS = {"swVersion": 4352, "wifiRssi": -55, "countryCode": 1}
+
 ENTRY_DATA = {
     CONF_USERNAME: "user@example.com",
     CONF_PASSWORD: "secret",
@@ -81,64 +87,69 @@ class MockChannel:
 
     def __init__(self, number: int) -> None:
         """Initialize the mock channel."""
-        self.channel_number = number
-        self.channel_info = deepcopy(CHANNEL_INFO)
-        self.channel_status = deepcopy(CHANNEL_STATUS)
-        self.callbacks: list = []
+        self.number = number
+        self.info = deepcopy(CHANNEL_INFO)
+        self.status = deepcopy(CHANNEL_STATUS)
         self.set_power_state = AsyncMock()
         self.set_temperature = AsyncMock()
         self.set_hot_button_state = AsyncMock()
-
-    def register_callback(self, cb) -> None:
-        """Register a push callback."""
-        self.callbacks.append(cb)
-
-    def deregister_callback(self, cb) -> None:
-        """Deregister a push callback."""
-        if cb in self.callbacks:
-            self.callbacks.remove(cb)
 
     def is_available(self) -> bool:
         """Return availability."""
         return True
 
 
-class MockNavilink:
-    """Mock NavilinkConnect client."""
+class MockNavilinkClient:
+    """Mock NavilinkClient."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, username, password, *, session=None, device_index=0,
+                 poll_interval=15) -> None:
         """Initialize with no connection."""
-        self.device_info: dict | None = None
+        self._username = username
+        self.device_info: dict = {}
         self.device_status: dict = {}
         self.connected: bool = False
         self.channels: dict[int, MockChannel] = {}
+        self.on_update = None
 
-    async def login(self) -> list[dict]:
+    async def async_login(self) -> list[dict]:
         """Return the device list."""
-        self.device_info = DEVICE_LIST[0]
-        return DEVICE_LIST
+        return deepcopy(DEVICE_LIST)
 
-    async def start(self) -> None:
+    async def async_connect(self) -> None:
         """Connect and discover one channel."""
-        self.device_info = {
-            **DEVICE_LIST[0],
-            "descaling": {
-                "descalingStartTime": "2026-06-01T00:00:00",
-                "descalingEndTime": "2027-06-01T00:00:00",
-            },
-        }
-        self.device_status = {"swVersion": 4352, "wifiRssi": -55, "countryCode": 1}
+        self.device_info = deepcopy(DEVICE_LIST[0])
+        self.device_status = deepcopy(DEVICE_STATUS)
         self.connected = True
         self.channels = {1: MockChannel(1)}
 
-    async def disconnect(self) -> None:
+    async def async_disconnect(self) -> None:
         """Disconnect (no-op)."""
+        self.connected = False
 
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable loading of the custom integration in every test."""
     yield
+
+
+@pytest.fixture(autouse=True)
+def _mock_clientsession():
+    """Avoid building a real aiohttp session (aiodns spawns a pycares thread)."""
+    from unittest.mock import MagicMock
+
+    with (
+        patch(
+            "custom_components.navien_navilink_wh.coordinator.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.navien_navilink_wh.config_flow.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -163,19 +174,19 @@ def mock_config_entry() -> MockConfigEntry:
 
 
 @pytest.fixture
-def mock_navilink() -> Generator[type[MockNavilink]]:
-    """Patch NavilinkConnect in both the coordinator and config flow."""
+def mock_navilink() -> Generator[type[MockNavilinkClient]]:
+    """Patch NavilinkClient in both the coordinator and config flow."""
     with (
         patch(
-            "custom_components.navien_navilink_wh.coordinator.NavilinkConnect",
-            MockNavilink,
+            "custom_components.navien_navilink_wh.coordinator.NavilinkClient",
+            MockNavilinkClient,
         ),
         patch(
-            "custom_components.navien_navilink_wh.config_flow.NavilinkConnect",
-            MockNavilink,
+            "custom_components.navien_navilink_wh.config_flow.NavilinkClient",
+            MockNavilinkClient,
         ),
     ):
-        yield MockNavilink
+        yield MockNavilinkClient
 
 
 async def setup_integration(hass, entry) -> None:

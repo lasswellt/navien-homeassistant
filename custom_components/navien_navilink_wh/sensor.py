@@ -10,7 +10,7 @@ Categorisation:
   descaling) are EntityCategory.DIAGNOSTIC; the noisy ones are disabled by
   default.
 
-Values are unit-scaled by ``navien_api`` per the channel ``temperatureType``;
+Values are unit-scaled by the ``navilink`` client per ``temperatureType``;
 descriptions carry HA-facing metadata only.
 """
 
@@ -41,7 +41,7 @@ from homeassistant.util import dt as dt_util
 
 from .coordinator import NavienChannelData, NavienConfigEntry, NavienData
 from .entity import NavienChannelEntity
-from .navien_api import TemperatureType
+from .navilink import TemperatureType
 
 PARALLEL_UPDATES = 0
 

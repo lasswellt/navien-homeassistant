@@ -42,7 +42,7 @@ async def test_switch_power_toggle(
 ) -> None:
     """Power switch issues control commands."""
     await setup_integration(hass, mock_config_entry)
-    channel = mock_config_entry.runtime_data.navilink.channels[1]
+    channel = mock_config_entry.runtime_data.client.channels[1]
     entity_id = _entity_id(hass, Platform.SWITCH, f"{MAC}_1_power")
 
     await hass.services.async_call(
@@ -61,7 +61,7 @@ async def test_switch_hot_button(
 ) -> None:
     """Hot-button switch issues on-demand commands."""
     await setup_integration(hass, mock_config_entry)
-    channel = mock_config_entry.runtime_data.navilink.channels[1]
+    channel = mock_config_entry.runtime_data.client.channels[1]
     entity_id = _entity_id(hass, Platform.SWITCH, f"{MAC}_1_hot_button")
 
     await hass.services.async_call(
@@ -75,7 +75,7 @@ async def test_command_failure_raises(
 ) -> None:
     """A failed control command surfaces a translated error."""
     await setup_integration(hass, mock_config_entry)
-    channel = mock_config_entry.runtime_data.navilink.channels[1]
+    channel = mock_config_entry.runtime_data.client.channels[1]
     channel.set_power_state.side_effect = RuntimeError("mqtt down")
     entity_id = _entity_id(hass, Platform.SWITCH, f"{MAC}_1_power")
 
@@ -90,7 +90,7 @@ async def test_water_heater_set_temperature(
 ) -> None:
     """Setting a valid temperature forwards to the channel (F = 1:1)."""
     await setup_integration(hass, mock_config_entry)
-    channel = mock_config_entry.runtime_data.navilink.channels[1]
+    channel = mock_config_entry.runtime_data.client.channels[1]
     entity_id = _entity_id(hass, Platform.WATER_HEATER, f"{MAC}_1")
 
     await hass.services.async_call(
@@ -123,7 +123,7 @@ async def test_water_heater_operation_and_away(
 ) -> None:
     """Operation mode and away mode map to power state."""
     await setup_integration(hass, mock_config_entry)
-    channel = mock_config_entry.runtime_data.navilink.channels[1]
+    channel = mock_config_entry.runtime_data.client.channels[1]
     entity_id = _entity_id(hass, Platform.WATER_HEATER, f"{MAC}_1")
 
     await hass.services.async_call(
@@ -166,17 +166,17 @@ async def test_capability_gated_sensors(
     """Combi heating sensors appear only when the unit reports a heat range."""
     from unittest.mock import patch
 
-    from .conftest import MockNavilink
+    from .conftest import MockNavilinkClient
 
-    class _Combi(MockNavilink):
-        async def start(self):
-            await super().start()
-            self.channels[1].channel_info.update(
+    class _Combi(MockNavilinkClient):
+        async def async_connect(self):
+            await super().async_connect()
+            self.channels[1].info.update(
                 {"setupHeatTempMin": 80, "setupHeatTempMax": 140}
             )
 
     with patch(
-        "custom_components.navien_navilink_wh.coordinator.NavilinkConnect", _Combi
+        "custom_components.navien_navilink_wh.coordinator.NavilinkClient", _Combi
     ):
         await setup_integration(hass, mock_config_entry)
 

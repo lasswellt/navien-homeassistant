@@ -1,11 +1,9 @@
 """DataUpdateCoordinator for the Navien NaviLink integration.
 
-The vendored :class:`NavilinkConnect` client is push-based: it polls the NaviLink
-AWS-IoT MQTT broker on its own interval and fires per-channel callbacks. This
-coordinator owns the connection lifecycle, builds an immutable :class:`NavienData`
-snapshot on every push, and feeds it to entities via ``async_set_updated_data``.
-``update_interval`` is therefore ``None`` (pure push); the initial snapshot is
-produced in :meth:`_async_setup`.
+Wraps the native :class:`NavilinkClient` (REST auth + AWS-IoT MQTT over
+WebSocket). The client polls on its own interval and pushes status; this
+coordinator builds an immutable :class:`NavienData` snapshot on each push and
+feeds it to entities via ``async_set_updated_data``.
 """
 
 from __future__ import annotations
@@ -14,7 +12,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-import certifi
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
@@ -23,6 +20,7 @@ from homeassistant.exceptions import (
     HomeAssistantError,
 )
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -33,13 +31,11 @@ from .const import (
     DEFAULT_POLLING_INTERVAL,
     DOMAIN,
 )
-from .navien_api import (
+from .navilink import (
+    AuthenticationError,
     DeviceSorting,
-    NavilinkConnect,
-    NoNavienDevices,
-    NoResponseData,
-    UnableToConnect,
-    UserNotFound,
+    NavilinkClient,
+    NavilinkError,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,7 +76,7 @@ class NavienData:
 
 
 class NavienDataUpdateCoordinator(DataUpdateCoordinator[NavienData]):
-    """Owns the NaviLink connection and publishes typed snapshots."""
+    """Owns the NaviLink client and publishes typed snapshots."""
 
     config_entry: NavienConfigEntry
 
@@ -93,24 +89,22 @@ class NavienDataUpdateCoordinator(DataUpdateCoordinator[NavienData]):
             config_entry=entry,
             update_interval=None,  # pure push; fed via async_set_updated_data
         )
-        # AWS IoT TLS validates the broker against a root CA. Amazon Root CA 1
-        # ships in the certifi bundle (bundled with Home Assistant).
-        self.navilink = NavilinkConnect(
-            userId=entry.data.get(CONF_USERNAME, ""),
-            passwd=entry.data.get(CONF_PASSWORD, ""),
+        self.client = NavilinkClient(
+            entry.data.get(CONF_USERNAME, ""),
+            entry.data.get(CONF_PASSWORD, ""),
+            session=async_get_clientsession(hass),
             device_index=entry.data.get(CONF_DEVICE_INDEX, 0),
-            polling_interval=entry.options.get(
+            poll_interval=entry.options.get(
                 CONF_POLLING_INTERVAL,
                 entry.data.get(CONF_POLLING_INTERVAL, DEFAULT_POLLING_INTERVAL),
             ),
-            aws_cert_path=certifi.where(),
         )
 
-    # ----- gateway-level convenience (device registry) -----
+    # ----- gateway-level convenience -----
 
     @property
     def _gateway(self) -> dict[str, Any]:
-        return (self.navilink.device_info or {}).get("deviceInfo", {})
+        return (self.client.device_info or {}).get("deviceInfo", {})
 
     @property
     def gateway_mac(self) -> str:
@@ -122,55 +116,25 @@ class NavienDataUpdateCoordinator(DataUpdateCoordinator[NavienData]):
         """Return the gateway display name."""
         return self._gateway.get("deviceName", "Navien")
 
+    @property
+    def gateway_sw_version(self) -> str | None:
+        """Return the gateway firmware version, if captured."""
+        version = self.client.device_status.get("swVersion")
+        return str(version) if version is not None else None
+
     def channel_model(self, number: int) -> str | None:
         """Return the product-line model name for a channel, if known."""
-        channel = self.navilink.channels.get(number)
+        channel = self.client.channels.get(number)
         if channel is None:
             return None
         try:
-            return DeviceSorting(channel.channel_info.get("unitType")).name
+            return DeviceSorting(channel.info.get("unitType")).name
         except ValueError:
             return None
 
     def channel_client(self, number: int):
         """Return the live channel object for issuing control commands."""
-        return self.navilink.channels[number]
-
-    # ----- lifecycle -----
-
-    async def _async_setup(self) -> None:
-        """Log in, connect, discover channels, and wire push callbacks."""
-        try:
-            await self.navilink.start()
-        except UserNotFound as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
-        except (UnableToConnect, NoResponseData, NoNavienDevices) as err:
-            raise ConfigEntryNotReady(str(err)) from err
-        except Exception as err:  # noqa: BLE001
-            raise ConfigEntryNotReady(f"Unexpected NaviLink setup error: {err}") from err
-
-        if not self.navilink.channels:
-            raise ConfigEntryNotReady("NaviLink returned no channels for this gateway")
-
-        for number, channel in self.navilink.channels.items():
-            channel.register_callback(self._handle_push)
-            self._check_model_support(number, channel.channel_info.get("unitType"))
-
-    def _check_model_support(self, number: int, unit_type: Any) -> None:
-        """Raise a repair issue when the unit type is not recognised."""
-        issue_id = f"unsupported_model_{self.config_entry.entry_id}_{number}"
-        if self.channel_model(number) is None:
-            ir.async_create_issue(
-                self.hass,
-                DOMAIN,
-                issue_id,
-                is_fixable=False,
-                severity=ir.IssueSeverity.WARNING,
-                translation_key="unsupported_model",
-                translation_placeholders={"unit_type": str(unit_type)},
-            )
-        else:
-            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+        return self.client.channels[number]
 
     async def async_send_command(self, coro) -> None:
         """Await a control coroutine, surfacing failures as a translated error."""
@@ -181,43 +145,70 @@ class NavienDataUpdateCoordinator(DataUpdateCoordinator[NavienData]):
                 translation_domain=DOMAIN, translation_key="command_failed"
             ) from err
 
+    # ----- lifecycle -----
+
+    async def _async_setup(self) -> None:
+        """Connect, discover channels, and wire the push callback."""
+        self.client.on_update = self._handle_push
+        try:
+            await self.client.async_connect()
+        except AuthenticationError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except NavilinkError as err:
+            raise ConfigEntryNotReady(str(err)) from err
+        except Exception as err:  # noqa: BLE001
+            raise ConfigEntryNotReady(f"Unexpected NaviLink setup error: {err}") from err
+
+        if not self.client.channels:
+            raise ConfigEntryNotReady("NaviLink returned no channels for this gateway")
+
+        for number, channel in self.client.channels.items():
+            self._check_model_support(number, channel.info.get("unitType"))
+
+    def _check_model_support(self, number: int, unit_type: Any) -> None:
+        """Raise a repair issue when the unit type is not recognised."""
+        issue_id = f"unsupported_model_{self.config_entry.entry_id}_{number}"
+        if self.channel_model(number) is None:
+            ir.async_create_issue(
+                self.hass, DOMAIN, issue_id, is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="unsupported_model",
+                translation_placeholders={"unit_type": str(unit_type)},
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+
     async def _async_update_data(self) -> NavienData:
         """Return the current snapshot (also the initial first-refresh value)."""
-        if not self.navilink.channels:
+        if not self.client.channels:
             raise UpdateFailed("NaviLink connection has no channels")
         return self._build_snapshot()
 
     @callback
     def _handle_push(self) -> None:
-        """Rebuild the snapshot when the push client reports new status."""
+        """Rebuild the snapshot when the client reports new status."""
         self.async_set_updated_data(self._build_snapshot())
-
-    @property
-    def gateway_sw_version(self) -> str | None:
-        """Return the gateway firmware version, if captured."""
-        version = (self.navilink.device_status or {}).get("swVersion")
-        return str(version) if version is not None else None
 
     def _build_snapshot(self) -> NavienData:
         """Construct an immutable snapshot from the live client state."""
         return NavienData(
-            device_info=self.navilink.device_info or {},
-            device_status=dict(self.navilink.device_status or {}),
-            connected=bool(self.navilink.connected),
+            device_info=self.client.device_info or {},
+            device_status=dict(self.client.device_status or {}),
+            connected=self.client.connected,
             channels={
                 number: NavienChannelData(
                     number=number,
-                    info=dict(channel.channel_info),
-                    status=dict(channel.channel_status),
+                    info=dict(channel.info),
+                    status=dict(channel.status),
                     available=channel.is_available(),
                 )
-                for number, channel in self.navilink.channels.items()
+                for number, channel in self.client.channels.items()
             },
         )
 
     async def async_disconnect(self) -> None:
-        """Disconnect from the NaviLink broker (best effort)."""
+        """Disconnect the NaviLink client (best effort)."""
         try:
-            await self.navilink.disconnect()
+            await self.client.async_disconnect()
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Error during NaviLink disconnect: %s", err)

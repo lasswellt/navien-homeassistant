@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .coordinator import NavienConfigEntry
 from .entity import NavienChannelEntity
-from .navien_api import TemperatureType
+from .navilink import TemperatureType
 
 _LOGGER = logging.getLogger(__name__)
 

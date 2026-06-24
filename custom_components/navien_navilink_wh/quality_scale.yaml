@@ -80,14 +80,20 @@ rules:
 
   # Platinum
   async-dependency:
-    status: todo
+    status: done
     comment: |
-      Blocked. The vendored NaviLink transport uses AWSIoTPythonSDK, a blocking
-      client driven via run_in_executor. Reaching platinum requires replacing it
-      with a native-async MQTT client (aiomqtt + AWS-IoT SigV4 websocket auth).
+      The native navilink client is asyncio-driven. The MQTT transport pumps
+      paho-mqtt on the event loop via add_reader/add_writer + loop_misc (no
+      background network thread); only the one-time TLS/WebSocket handshake runs
+      in an executor. REST + SigV4 are pure async/stdlib.
   inject-websession:
-    status: todo
-    comment: REST login creates its own aiohttp session; not yet injected.
+    status: done
+    comment: |
+      The client accepts an aiohttp.ClientSession; the integration passes
+      async_get_clientsession(hass) (coordinator + config flow).
   strict-typing:
     status: todo
-    comment: Vendored client is untyped; strict-typing registration is core-only.
+    comment: |
+      The navilink package ships py.typed and is typed throughout. Full
+      strict-typing requires registration in homeassistant's .strict-typing +
+      mypy-strict CI, which is core-only (not applicable to a HACS component).

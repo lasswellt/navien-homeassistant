@@ -8,8 +8,8 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/lasswellt/navien-homeassistant/issues",
-  "loggers": ["custom_components.navien_navilink_wh", "AWSIoTPythonSDK", "aiohttp"],
+  "loggers": ["custom_components.navien_navilink_wh", "paho"],
   "quality_scale": "gold",
-  "requirements": ["AWSIoTPythonSDK>=1.5.4"],
-  "version": "2026.06.02"
+  "requirements": ["paho-mqtt>=1.6.1"],
+  "version": "2026.06.03"
 }
