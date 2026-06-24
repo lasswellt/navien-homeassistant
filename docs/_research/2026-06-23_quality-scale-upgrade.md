@@ -48,9 +48,9 @@ scope:
 
 ## Summary
 
-Current integration sits at solid **bronze**, ~80% of **silver**. Target **gold** (21 rules) is fully attainable and is the right bar — it's the "legit" line for a polished cloud integration. **Platinum is blocked** by one rule: `async-dependency` forbids executor workarounds "no exceptions," but the vendored `navien_api.py` drives the blocking `AWSIoTPythonSDK` via `run_in_executor`. Platinum therefore requires replacing the MQTT transport with a native-async client (`aiomqtt` + manual AWS-IoT SigV4 websocket auth) — a large, higher-risk rewrite. **Recommendation: ship gold now; treat platinum as a separate, optional transport-rewrite epic.**
+Current integration sits at solid **bronze**, ~80% of **silver**. Target **gold** (21 rules) is fully attainable and is the right bar — it's the "legit" line for a polished cloud integration. **Platinum is blocked** by one rule: `async-dependency` forbids executor workarounds "no exceptions," but the then-current transport drove the blocking `AWSIoTPythonSDK` via `run_in_executor`. Platinum therefore requires replacing the MQTT transport with a native-async client (`aiomqtt` + manual AWS-IoT SigV4 websocket auth) — a large, higher-risk rewrite. **Recommendation: ship gold now; treat platinum as a separate, optional transport-rewrite epic.**
 
-Biggest single lever for "legit": the **EntityDescription refactor** — replace the per-entity bespoke classes (ported from nikshriv) with frozen `*EntityDescription` dataclasses carrying `value_fn`, `device_class`, `state_class`, `entity_category`, `translation_key`, `entity_registry_enabled_default`. This unlocks `entity-translations`, `entity-category`, `entity-device-class`, `entity-disabled-by-default`, and `icon-translations` in one pass, and is the canonical shape every gold/platinum WH integration uses.
+Biggest single lever for "legit": the **EntityDescription refactor** — replace the per-entity bespoke classes with frozen `*EntityDescription` dataclasses carrying `value_fn`, `device_class`, `state_class`, `entity_category`, `translation_key`, `entity_registry_enabled_default`. This unlocks `entity-translations`, `entity-category`, `entity-device-class`, `entity-disabled-by-default`, and `icon-translations` in one pass, and is the canonical shape every gold/platinum WH integration uses.
 
 ## Research Questions
 
@@ -175,6 +175,6 @@ Then bump `manifest.json quality_scale: gold` and add `quality_scale.yaml` self-
 
 **GOLD (21):** devices `done` · diagnostics `done` · discovery `exempt`(cloud account, undiscoverable) · discovery-update-info `exempt` · docs-data-update `todo` · docs-examples `todo` · docs-known-limitations `todo` · docs-supported-devices `todo` · docs-supported-functions `todo` · docs-troubleshooting `todo` · docs-use-cases `todo` · dynamic-devices `exempt`(single device/entry — verify R4) · entity-category `todo` · entity-device-class `todo`(partial in sensors) · entity-disabled-by-default `todo` · entity-translations `todo` · exception-translations `todo` · icon-translations `todo` · reconfiguration-flow `todo` · repair-issues `todo`(token-expiry, unsupported-model) · stale-devices `exempt`(single device — verify R4)
 
-**PLATINUM (3):** async-dependency `todo`→**blocked**(AWSIoTPythonSDK blocking; R1) · inject-websession `todo`(REST login creates own session) · strict-typing `todo`(vendored client untyped; core-only registration)
+**PLATINUM (3):** async-dependency `todo`→**blocked**(AWSIoTPythonSDK blocking; R1) · inject-websession `todo`(REST login creates own session) · strict-typing `todo`(transport client untyped; core-only registration)
 
 **Tally:** done=16, exempt=7, todo=29. Gold reachable by closing the 21 gold `todo`/`partial` (minus 4 already exempt).

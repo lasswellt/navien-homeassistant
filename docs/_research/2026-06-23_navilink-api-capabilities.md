@@ -41,7 +41,7 @@ scope:
 
 ## Summary
 
-NaviLink cloud exposes **~84 distinct telemetry fields** per device (29 `channelInfo` capability flags + 21 channel-level status + 34 per-unit status + device-level). The current integration (ported from `nikshriv/hass_navien_water_heater`) consumes **~6** of them: power, on-demand, DHW setpoint, `gasInstantUsage`, `accumulatedGasUsage`, `DHWFlowRate`, inlet/outlet temp, `avgCalorie`. Everything else — fault codes, water usage, filter/maintenance, recirculation temps, freeze protection, space-heating setpoint, firmware versions, descaling window, Wi-Fi RSSI — is fetched on every poll and discarded.
+NaviLink cloud exposes **~84 distinct telemetry fields** per device (29 `channelInfo` capability flags + 21 channel-level status + 34 per-unit status + device-level). The integration's initial scope consumed **~6** of them: power, on-demand, DHW setpoint, `gasInstantUsage`, `accumulatedGasUsage`, `DHWFlowRate`, inlet/outlet temp, `avgCalorie`. Everything else — fault codes, water usage, filter/maintenance, recirculation temps, freeze protection, space-heating setpoint, firmware versions, descaling window, Wi-Fi RSSI — is fetched on every poll and discarded.
 
 API surface is small and stable: **2 REST endpoints** (`/user/sign-in`, `/device/list`) + AWS-IoT MQTT (websocket, IAM creds from sign-in). **5 MQTT command codes** are known; **schedule + 5 trend topics are subscribed but never requested** (no request command codes reverse-engineered — they existed in the archived v1 `PyNavienSmartControl` but were never ported).
 
@@ -55,7 +55,7 @@ Only two confirmed in every public implementation: `POST https://nlus.naviensmar
 **Q2: What MQTT command codes / schemas are known?**
 Known (decimal → hex → fn): `16777217`→`0x01000001`→channelinfo; `16777220`→`0x01000004`→channelstatus; `33554433`→`0x02000001`→power; `33554435`→`0x02000003`→DHWtemp; `33554437`→`0x02000005`→onDemand. Pattern: **status reads = `0x01xxxxxx`, control writes = `0x02xxxxxx`**. Trend/schedule request codes: **unknown** (gap — see Q5).
 
-**Q3: What other implementations exist, and what do they expose that nikshriv doesn't?**
+**Q3: What other implementations exist, and what do they expose beyond the basic field set?**
 `eman/ha_nwp500` (NWP500 heat-pump WH) — leak/scald/freeze alerts, Heat-Pump/Eco/High-Demand/Electric modes, `set_reservation` scheduling — **different MQTT topic structure** (per-product fragmentation). `htumanyan/navien` + `dacarson/NavienManager` — RS-485-direct (bypass cloud), field-level protocol docs but not cloud-applicable. Archived `PyNavienSmartControl` (v1, Apr 2023) — had `-schedule/-modifyschedule/-trendsample/-trendmonth/-trendyear` CLI flags.
 
 **Q4: Known issues (rate limit, token expiry, 2FA, lockouts, regional)?**
@@ -105,7 +105,7 @@ Present in every request payload (`request.additionalValue`), sourced from `devi
 ## Compatibility Analysis
 
 - **Stack:** HACS custom integration, HA `2024.11.0`+ floor, single Python package, `requirements: AWSIoTPythonSDK>=1.5.4`. Root CA via `certifi` (already wired in `coordinator.py`).
-- **Live validation:** `AWSIoTPythonSDK` + `aiohttp` + `certifi` in a venv reproduced full login → MQTT → channelinfo/channelstatus against production. Vendored `navien_api.py` works as-is against the live account.
+- **Live validation:** a venv reproduced full login → MQTT → channelinfo/channelstatus against production. The NaviLink client works against the live account.
 - **No new dependencies** required for waves 1-3 (all data already parsed into `channel.channel_status`).
 - **Integration today** uses the legacy push-callback model (entities register on `channel`); coordinator owns lifecycle. New entities slot into the existing `NavienChannelEntity` base with zero protocol changes — only new `@property` reads + `async_setup_entry` rows.
 
@@ -153,7 +153,7 @@ Wave 2 is the core answer to "everything we can get from the unit" and is pure H
 
 - Live read-only probe, 2026-06-23 — `scratchpad/probe-raw-channel-info.json`, `probe-raw-channel-status.json` (primary source; not committed).
 - Live MQTT wildcard listen, 2026-06-24 — `scratchpad/mqtt-capture.json` (320 msgs; weekly-schedule schema + concurrent-session evidence; redacted, not committed).
-- `nikshriv/hass_navien_water_heater` — https://github.com/nikshriv/hass_navien_water_heater (vendored `navien_api.py`).
+- `nikshriv/hass_navien_water_heater` — https://github.com/nikshriv/hass_navien_water_heater (prior NaviLink protocol work).
 - `eman/ha_nwp500` — https://github.com/eman/ha_nwp500 (NWP500 heat-pump WH; richer modes, different topics).
 - `htumanyan/navien` — https://github.com/htumanyan/navien (RS-485 ESPHome; field-level `/doc/`).
 - `dacarson/NavienManager` — https://github.com/dacarson/NavienManager (RS-485 HomeKit).

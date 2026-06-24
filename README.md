@@ -4,12 +4,9 @@
 
 A custom [Home Assistant](https://www.home-assistant.io/) integration for
 **Navien** tankless water heaters and boilers connected through the
-**NaviLink** cloud service (AWS IoT).
-
-> Modern rewrite scaffolded from
-> [nikshriv/hass_navien_water_heater](https://github.com/nikshriv/hass_navien_water_heater),
-> restructured around config entries, `runtime_data`, a connection coordinator,
-> and a shared base entity.
+**NaviLink** cloud service (AWS IoT). Built around config entries,
+`runtime_data`, a connection coordinator, a shared base entity, and a
+self-contained native NaviLink client.
 
 ## Supported devices
 
