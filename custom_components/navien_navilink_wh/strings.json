@@ -15,13 +15,22 @@
         "data": {
           "device_index": "Gateway"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Navien NaviLink",
+        "description": "Your NaviLink credentials are no longer valid. Enter them again.",
+        "data": {
+          "username": "Username (email)",
+          "password": "Password"
+        }
       }
     },
     "error": {
       "invalid_auth": "Invalid authentication. Check your username and password."
     },
     "abort": {
-      "already_configured": "This gateway is already configured."
+      "already_configured": "This gateway is already configured.",
+      "reauth_successful": "Re-authentication was successful."
     }
   },
   "options": {

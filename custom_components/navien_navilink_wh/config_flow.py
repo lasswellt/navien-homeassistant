@@ -96,6 +96,60 @@ class NavienConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
         )
 
+    async def async_step_reauth(
+        self, entry_data: dict[str, Any]
+    ) -> ConfigFlowResult:
+        """Handle re-authentication when stored credentials stop working."""
+        self._username = entry_data.get(CONF_USERNAME, "")
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Prompt for new credentials and validate them against NaviLink."""
+        reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        assert reauth_entry is not None
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                navien = NavilinkConnect(
+                    user_input[CONF_USERNAME],
+                    user_input[CONF_PASSWORD],
+                    polling_interval=0,
+                )
+                await navien.login()
+            except Exception:  # noqa: BLE001 — any failure is auth/connection
+                errors["base"] = "invalid_auth"
+            else:
+                self.hass.config_entries.async_update_entry(
+                    reauth_entry,
+                    data={
+                        **reauth_entry.data,
+                        CONF_USERNAME: user_input[CONF_USERNAME],
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                    },
+                )
+                await self.hass.config_entries.async_reload(reauth_entry.entry_id)
+                return self.async_abort(reason="reauth_successful")
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_USERNAME,
+                        default=self._username
+                        or reauth_entry.data.get(CONF_USERNAME, ""),
+                    ): str,
+                    vol.Required(CONF_PASSWORD): str,
+                }
+            ),
+            errors=errors,
+        )
+
     async def _async_create_or_update(self) -> ConfigFlowResult:
         """Create the entry, deduping on gateway MAC."""
         assert self._device_info is not None
