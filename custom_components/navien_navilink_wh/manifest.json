@@ -11,5 +11,5 @@
   "loggers": ["custom_components.navien_navilink_wh", "AWSIoTPythonSDK", "aiohttp"],
   "quality_scale": "gold",
   "requirements": ["AWSIoTPythonSDK>=1.5.4"],
-  "version": "2026.6.23"
+  "version": "2026.06.01"
 }
