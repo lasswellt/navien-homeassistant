@@ -160,6 +160,47 @@ async def test_sensor_state(
     assert hass.states.get(entity_id).state == "87"
 
 
+async def test_capability_gated_sensors(
+    hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Combi heating sensors appear only when the unit reports a heat range."""
+    from unittest.mock import patch
+
+    from .conftest import MockNavilink
+
+    class _Combi(MockNavilink):
+        async def start(self):
+            await super().start()
+            self.channels[1].channel_info.update(
+                {"setupHeatTempMin": 80, "setupHeatTempMax": 140}
+            )
+
+    with patch(
+        "custom_components.navien_navilink_wh.coordinator.NavilinkConnect", _Combi
+    ):
+        await setup_integration(hass, mock_config_entry)
+
+    ent_reg = er.async_get(hass)
+    # combi → heating-loop sensors created
+    assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{MAC}_1_1_supply_temp")
+    assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{MAC}_1_heat_setting_temp")
+    # no tank sensor on this unit → not created
+    assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{MAC}_1_1_dhw_tank_temp") is None
+
+
+async def test_dhw_only_omits_heating_sensors(
+    hass: HomeAssistant, mock_navilink, mock_config_entry
+) -> None:
+    """The default DHW-only unit does not create combi heating sensors."""
+    await setup_integration(hass, mock_config_entry)
+    ent_reg = er.async_get(hass)
+    assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{MAC}_1_1_supply_temp") is None
+    # recirculation IS supported (onDemandUse == 1) → created
+    assert ent_reg.async_get_entity_id(
+        "sensor", DOMAIN, f"{MAC}_1_1_recirculation_temp"
+    )
+
+
 async def test_diagnostics_redacts(
     hass: HomeAssistant, mock_navilink, mock_config_entry
 ) -> None:

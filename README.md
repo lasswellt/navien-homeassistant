@@ -40,14 +40,19 @@ NWP500 heat-pump water heater (different protocol — use a dedicated integratio
 |---|---|
 | `water_heater` | Target temperature, away mode, operation mode (on/off), current temperature |
 | `switch` | Power; on-demand (hot-button) recirculation (when the unit reports `onDemandUse`) |
-| `sensor` | Hot-water / inlet temperature, hot-water flow, current + cumulative gas usage, heating power; *(diagnostic, disabled by default)* supply/return/recirculation/outdoor/tank temps, cumulative water usage, water-draw counts, filter days/status, recirculation, CIP descaling, operation/thermostat status, error + sub-error codes, controller/panel firmware, Wi-Fi signal, country code, descaling window start/end |
+| `sensor` (primary, enabled) | Hot-water + inlet temperature, hot-water flow, current + cumulative gas usage, heating power |
+| `sensor` (capability-gated) | Created only on units that report the feature, then enabled: recirculation temp (recirc/on-demand units); supply/return/heating-setpoint temps + heating flow (combi); tank temp (storage units); supply/return air temps (air units) |
+| `sensor` (diagnostic) | Wi-Fi signal + descaling window start/end *(enabled)*; firmware versions, error + sub-error codes, operation/thermostat/filter/PoE status, water-draw counts, CIP descaling internals, country code *(disabled by default)* |
 | `binary_sensor` | Fault (`problem`, with `error_code` / `sub_error_code` attributes); freeze protection, cloud connection *(diagnostic)* |
 
-The integration surfaces the **full** NaviLink MQTT/API telemetry surface — the
-primary readings are enabled; everything else is a disabled-by-default
-diagnostic entity you can turn on per-entity. Device firmware (`sw_version`) and
-MAC are set on the device record. The diagnostics download includes the complete
-raw `device_info` / `device_status` / per-channel payloads with identity,
+The integration surfaces the **full** NaviLink MQTT/API telemetry surface.
+Temperatures, flow, and gas/water are real measurements (not lumped under
+diagnostics); feature-specific sensors are created only on units that support
+them so a DHW-only heater isn't cluttered with placeholder heating/tank
+entities. Technical/status fields are diagnostic and mostly disabled by default —
+enable any of them per-entity. Device firmware (`sw_version`) and MAC are set on
+the device record. The diagnostics download includes the complete raw
+`device_info` / `device_status` / per-channel payloads with identity,
 credentials, and location redacted.
 
 Diagnostic and rarely-needed sensors are disabled by default — enable them from
