@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Navien NaviLink",
+        "description": "Sign in with your NaviLink mobile app credentials.",
+        "data": {
+          "username": "Username (email)",
+          "password": "Password"
+        }
+      },
+      "pick_gateway": {
+        "title": "Select gateway",
+        "description": "Choose the NaviLink gateway to add.",
+        "data": {
+          "device_index": "Gateway"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid authentication. Check your username and password."
+    },
+    "abort": {
+      "already_configured": "This gateway is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Navien options",
+        "data": {
+          "polling_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  }
+}
