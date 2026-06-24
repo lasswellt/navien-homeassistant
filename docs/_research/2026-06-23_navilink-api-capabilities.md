@@ -87,6 +87,13 @@ Confirmed in `convert_channel_status`: Celsius mode divides temps & setpoint by 
 ### F5 — Trend/schedule: subscribed, never requested (confirmed gap)
 `weeklyschedule`, `simpletrend`, `hourlytrend`, `dailytrend`, `monthlytrend` have `_sub`/`_res`/`_req` topic builders, but handlers are **log-only stubs** and there are **no `Messages` request methods and no command codes**. Live probe with `subscribe_all_topics=True` received **zero** trend/schedule pushes in ~20s — these are pull-only and require a request publish we cannot construct yet. v1 `PyNavienSmartControl` had the feature → codes exist historically, never ported to the v2 MQTT shape.
 
+### F5.1 — Live MQTT listen (2026-06-24): weekly schedule reachable, trends still dark
+Wildcard-subscribed (`req+#`, `res+#`, `cmd/{deviceType}/{homeSeq}/#`) and fired best-effort request publishes (channel_status envelope) at the trend/schedule `status/*` topics with candidate command codes `16777222`–`16777226` (`0x01000006`–`0x0100000A`). Results (320 msgs, ~75s):
+- **Weekly schedule IS requestable.** Those codes returned a `weeklySchedule` object on `res/weeklyschedule` + `res/simpletrend`. Schema: `response.weeklySchedule.channel = { weeklyControl, totalDayCount, weeklySchdList[] }`. On the live unit it is **empty** — `weeklyControl=2` (schedule off), `weeklySchdList: []`, `totalDayCount=0`. So the topic is reachable; nothing to surface until a schedule is configured.
+- **Energy trends still return no data.** Every response to the `simpletrend`/`hourlytrend`/`dailytrend`/`monthlytrend` requests carried the `weeklySchedule` shape, never a trend array (no `gasUsage`/history keys anywhere in the capture). The trend command codes are still unknown — needs a NaviLink-app packet capture.
+- **Concurrent sessions coexist (resolves prior open question).** Observed `channelStatus` from two *other* client IDs on the same account (the mobile app) alongside this session — no lockout, no forced disconnect.
+- **Retained messages:** 262 `weeklySchedule` deliveries from 25 publishes → the broker retains + redelivers schedule/trend responses on (re)subscribe.
+
 ### F6 — `additionalValue` opaque token
 Present in every request payload (`request.additionalValue`), sourced from `device/list` `deviceInfo.additionalValue`. Purpose undocumented in all sources; must be echoed verbatim — treat as opaque.
 
@@ -137,13 +144,15 @@ Wave 2 is the core answer to "everything we can get from the unit" and is pure H
 
 1. Exact `operationMode` enum and `heatStatus`/`thermostatStatus`/`filterStatus` value maps — need observation under varying unit states.
 2. `heatTemperature` (or equivalent) control command code for combi space-heating setpoint — unverified.
-3. Trend/schedule request command codes (`0x01xxxxxx` class likely) — unknown; needs app traffic capture.
+3. ~~Trend/schedule request command codes~~ — **partially resolved (F5.1):** weekly-schedule reachable via codes `16777222`–`16777226`; **energy-trend** codes still unknown (responses returned schedule, not trend data) — needs NaviLink-app packet capture.
 4. Whether EU/KR accounts use a different REST host / topic tree.
 5. `additionalValue` semantics and whether it can change mid-session.
+6. Weekly-schedule write/edit codes + populated `weeklySchdList[]` entry shape (live unit had schedule disabled, so the list was empty).
 
 ## References
 
 - Live read-only probe, 2026-06-23 — `scratchpad/probe-raw-channel-info.json`, `probe-raw-channel-status.json` (primary source; not committed).
+- Live MQTT wildcard listen, 2026-06-24 — `scratchpad/mqtt-capture.json` (320 msgs; weekly-schedule schema + concurrent-session evidence; redacted, not committed).
 - `nikshriv/hass_navien_water_heater` — https://github.com/nikshriv/hass_navien_water_heater (vendored `navien_api.py`).
 - `eman/ha_nwp500` — https://github.com/eman/ha_nwp500 (NWP500 heat-pump WH; richer modes, different topics).
 - `htumanyan/navien` — https://github.com/htumanyan/navien (RS-485 ESPHome; field-level `/doc/`).
