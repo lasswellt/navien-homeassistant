@@ -4,28 +4,25 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .coordinator import NavienCoordinator
+from .coordinator import NavienConfigEntry, NavienDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
     Platform.WATER_HEATER,
     Platform.SENSOR,
+    Platform.BINARY_SENSOR,
     Platform.SWITCH,
 ]
-
-# entry.runtime_data holds the live coordinator
-type NavienConfigEntry = ConfigEntry[NavienCoordinator]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: NavienConfigEntry) -> bool:
     """Set up Navien NaviLink from a config entry."""
-    coordinator = NavienCoordinator(hass, entry)
-    await coordinator.async_setup()
+    coordinator = NavienDataUpdateCoordinator(hass, entry)
+    await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
 
@@ -41,7 +38,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: NavienConfigEntry) -> b
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        await entry.runtime_data.async_shutdown()
+        await entry.runtime_data.async_disconnect()
     return unload_ok
 
 

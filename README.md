@@ -54,15 +54,20 @@ polling interval via the integration's **Configure** dialog (10–120 s).
 ```
 custom_components/navien_navilink_wh/
 ├── __init__.py        # setup/unload, runtime_data, platform forwarding
-├── coordinator.py     # owns the NavilinkConnect lifecycle
-├── entity.py          # NavienChannelEntity base (device_info, availability, push callbacks)
-├── config_flow.py     # user + gateway steps, options flow
-├── water_heater.py    # WaterHeaterEntity per channel
-├── switch.py          # power + on-demand switches
-├── sensor.py          # temp / flow / gas / heating-power sensors
+├── coordinator.py     # DataUpdateCoordinator[NavienData]; push client → typed snapshot
+├── entity.py          # NavienChannelEntity base (CoordinatorEntity, device_info, availability)
+├── config_flow.py     # user + gateway steps, reauth, options flow
+├── water_heater.py    # WaterHeaterEntity (primary entity) per channel
+├── switch.py          # power + on-demand switches (EntityDescription + value_fn)
+├── sensor.py          # temp / flow / gas / diagnostics sensors (EntityDescription)
+├── binary_sensor.py   # fault (problem) + freeze-protection
 ├── diagnostics.py     # redacted diagnostics
+├── strings.json       # config + entity translations
+├── icons.json         # entity icon translations
 └── navien_api.py      # NaviLink AWS IoT client (vendored; root CA via certifi)
 ```
+
+Targeting Home Assistant [Integration Quality Scale](https://developers.home-assistant.io/docs/core/integration-quality-scale/) **gold** — see `docs/_research/2026-06-23_quality-scale-upgrade.md`.
 
 ## Credits
 

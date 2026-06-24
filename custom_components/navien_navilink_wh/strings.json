@@ -42,5 +42,29 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "heating_power": { "name": "Heating power" },
+      "hot_water_temp": { "name": "Hot water temperature" },
+      "inlet_temp": { "name": "Inlet temperature" },
+      "flow_rate": { "name": "Hot water flow" },
+      "gas_current": { "name": "Current gas usage" },
+      "gas_cumulative": { "name": "Cumulative gas usage" },
+      "recirculation_temp": { "name": "Recirculation temperature" },
+      "water_use_count": { "name": "Water draw count" },
+      "days_filter_used": { "name": "Filter days used" },
+      "error_code": { "name": "Error code" },
+      "controller_version": { "name": "Controller version" },
+      "panel_version": { "name": "Panel version" }
+    },
+    "binary_sensor": {
+      "fault": { "name": "Fault" },
+      "freeze_protection": { "name": "Freeze protection" }
+    },
+    "switch": {
+      "power": { "name": "Power" },
+      "hot_button": { "name": "Hot button" }
+    }
   }
 }

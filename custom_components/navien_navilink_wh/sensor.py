@@ -1,152 +1,165 @@
-"""Sensor platform for Navien NaviLink (temps, flow, gas usage)."""
+"""Sensor platform for Navien NaviLink.
+
+Values are already unit-scaled by ``navien_api`` per the channel's
+``temperatureType``; descriptions carry only HA-facing metadata. The native
+unit follows the channel's unit system (imperial when ``temperatureType`` is
+Fahrenheit, otherwise metric).
+"""
 
 from __future__ import annotations
 
-import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.const import (
     PERCENTAGE,
+    EntityCategory,
     UnitOfPower,
     UnitOfTemperature,
     UnitOfVolume,
+    UnitOfVolumeFlowRate,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from . import NavienConfigEntry
+from .coordinator import NavienChannelData, NavienConfigEntry
 from .entity import NavienChannelEntity
 from .navien_api import TemperatureType
 
-_LOGGER = logging.getLogger(__name__)
+PARALLEL_UPDATES = 0
 
-POWER_KCAL_PER_HOUR = "kcal/hr"
-FLOW_GALLONS_PER_MIN = "gal/min"
-FLOW_LITERS_PER_MIN = "L/min"
+POWER_KCAL_PER_HOUR = "kcal/h"
 
-UNIT_SENSOR_TYPES = (
-    "gasInstantUsage",
-    "accumulatedGasUsage",
-    "DHWFlowRate",
-    "currentInletTemp",
-    "currentOutletTemp",
+
+@dataclass(frozen=True, kw_only=True)
+class NavienChannelSensorEntityDescription(SensorEntityDescription):
+    """Channel-level sensor description."""
+
+    value_fn: Callable[[NavienChannelData], StateType]
+    unit_imperial: str | None = None
+    unit_metric: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class NavienUnitSensorEntityDescription(SensorEntityDescription):
+    """Per-unit (cascade) sensor description."""
+
+    value_fn: Callable[[dict], StateType]
+    unit_imperial: str | None = None
+    unit_metric: str | None = None
+
+
+CHANNEL_SENSORS: tuple[NavienChannelSensorEntityDescription, ...] = (
+    NavienChannelSensorEntityDescription(
+        key="heating_power",
+        translation_key="heating_power",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda c: c.status.get("avgCalorie"),
+    ),
 )
 
-
-@dataclass
-class GenericSensorDescription:
-    """Scalar sensor with a metric/imperial conversion factor."""
-
-    state_class: SensorStateClass
-    native_unit_of_measurement: str
-    name: str
-    conversion_factor: float
-    device_class: SensorDeviceClass | None = None
-
-    def convert(self, val: float) -> float:
-        """Apply the conversion factor."""
-        return round(val * self.conversion_factor, 1)
-
-
-@dataclass
-class TempSensorDescription:
-    """Temperature sensor with directional unit conversion."""
-
-    state_class: SensorStateClass
-    native_unit_of_measurement: str
-    name: str
-    convert_to: str
-    device_class: SensorDeviceClass | None = None
-
-    def convert(self, temp: float) -> float:
-        """Convert the temperature to the target HA unit."""
-        if self.convert_to == UnitOfTemperature.CELSIUS:
-            return round((temp - 32) * 5 / 9, 1)
-        if self.convert_to == UnitOfTemperature.FAHRENHEIT:
-            return round((temp * 9 / 5) + 32)
-        return temp
-
-
-def get_description(hass_units: str, navien_units: str, sensor_type: str):
-    """Build the description for a sensor type given the unit systems."""
-    same = hass_units == navien_units
-    descriptions = {
-        "gasInstantUsage": GenericSensorDescription(
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=(
-                POWER_KCAL_PER_HOUR if hass_units == "metric" else UnitOfPower.BTU_PER_HOUR
-            ),
-            name="Current gas use",
-            conversion_factor=(
-                1 if same else 3.96567 if hass_units == "us_customary" else 0.2521646022
-            ),
-        ),
-        "accumulatedGasUsage": GenericSensorDescription(
-            state_class=SensorStateClass.TOTAL_INCREASING,
-            native_unit_of_measurement=(
-                UnitOfVolume.CUBIC_METERS if hass_units == "metric" else UnitOfVolume.CUBIC_FEET
-            ),
-            name="Cumulative gas use",
-            conversion_factor=(
-                1 if same else 35.3147 if hass_units == "us_customary" else 0.0283168732
-            ),
-            device_class=SensorDeviceClass.GAS,
-        ),
-        "DHWFlowRate": GenericSensorDescription(
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=(
-                FLOW_LITERS_PER_MIN if hass_units == "metric" else FLOW_GALLONS_PER_MIN
-            ),
-            name="Hot water flow",
-            conversion_factor=(
-                1 if same else 0.264172 if hass_units == "us_customary" else 3.78541
-            ),
-        ),
-        "currentInletTemp": TempSensorDescription(
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=(
-                UnitOfTemperature.CELSIUS if hass_units == "metric" else UnitOfTemperature.FAHRENHEIT
-            ),
-            name="Inlet temp",
-            convert_to=(
-                "None" if same else UnitOfTemperature.FAHRENHEIT if hass_units == "us_customary" else UnitOfTemperature.CELSIUS
-            ),
-            device_class=SensorDeviceClass.TEMPERATURE,
-        ),
-        "currentOutletTemp": TempSensorDescription(
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=(
-                UnitOfTemperature.CELSIUS if hass_units == "metric" else UnitOfTemperature.FAHRENHEIT
-            ),
-            name="Hot water temp",
-            convert_to=(
-                "None" if same else UnitOfTemperature.FAHRENHEIT if hass_units == "us_customary" else UnitOfTemperature.CELSIUS
-            ),
-            device_class=SensorDeviceClass.TEMPERATURE,
-        ),
-    }
-    return descriptions.get(sensor_type)
-
-
-def _unit_systems(hass: HomeAssistant, channel) -> tuple[str, str]:
-    """Return (hass_units, navien_units) as 'metric' / 'us_customary'."""
-    hass_units = (
-        "us_customary"
-        if hass.config.units.temperature_unit == UnitOfTemperature.FAHRENHEIT
-        else "metric"
-    )
-    navien_units = (
-        "us_customary"
-        if channel.channel_info.get("temperatureType", 2) == TemperatureType.FAHRENHEIT.value
-        else "metric"
-    )
-    return hass_units, navien_units
+UNIT_SENSORS: tuple[NavienUnitSensorEntityDescription, ...] = (
+    NavienUnitSensorEntityDescription(
+        key="hot_water_temp",
+        translation_key="hot_water_temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        unit_imperial=UnitOfTemperature.FAHRENHEIT,
+        unit_metric=UnitOfTemperature.CELSIUS,
+        value_fn=lambda u: u.get("currentOutletTemp"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="inlet_temp",
+        translation_key="inlet_temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        unit_imperial=UnitOfTemperature.FAHRENHEIT,
+        unit_metric=UnitOfTemperature.CELSIUS,
+        value_fn=lambda u: u.get("currentInletTemp"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="flow_rate",
+        translation_key="flow_rate",
+        device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        unit_imperial=UnitOfVolumeFlowRate.GALLONS_PER_MINUTE,
+        unit_metric=UnitOfVolumeFlowRate.LITERS_PER_MINUTE,
+        value_fn=lambda u: u.get("DHWFlowRate"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="gas_current",
+        translation_key="gas_current",
+        state_class=SensorStateClass.MEASUREMENT,
+        unit_imperial=UnitOfPower.BTU_PER_HOUR,
+        unit_metric=POWER_KCAL_PER_HOUR,
+        value_fn=lambda u: u.get("gasInstantUsage"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="gas_cumulative",
+        translation_key="gas_cumulative",
+        device_class=SensorDeviceClass.GAS,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        unit_imperial=UnitOfVolume.CUBIC_FEET,
+        unit_metric=UnitOfVolume.CUBIC_METERS,
+        value_fn=lambda u: u.get("accumulatedGasUsage"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="recirculation_temp",
+        translation_key="recirculation_temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        unit_imperial=UnitOfTemperature.FAHRENHEIT,
+        unit_metric=UnitOfTemperature.CELSIUS,
+        entity_registry_enabled_default=False,
+        value_fn=lambda u: u.get("currentRecirculationTemp"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="water_use_count",
+        translation_key="water_use_count",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda u: u.get("numOfWaterUse"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="days_filter_used",
+        translation_key="days_filter_used",
+        native_unit_of_measurement="d",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda u: u.get("daysFilterUsed"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="error_code",
+        translation_key="error_code",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda u: u.get("errorCode"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="controller_version",
+        translation_key="controller_version",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda u: u.get("controllerVersion"),
+    ),
+    NavienUnitSensorEntityDescription(
+        key="panel_version",
+        translation_key="panel_version",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda u: u.get("panelVersion"),
+    ),
+)
 
 
 async def async_setup_entry(
@@ -156,105 +169,82 @@ async def async_setup_entry(
 ) -> None:
     """Set up Navien sensors from a config entry."""
     coordinator = entry.runtime_data
-    sensors: list[SensorEntity] = []
-    for channel in coordinator.channels.values():
-        hass_units, navien_units = _unit_systems(hass, channel)
-        sensors.append(NavienHeatingPowerSensor(coordinator, channel))
-        unit_list = channel.channel_status.get("unitInfo", {}).get("unitStatusList", [])
-        for unit_info in unit_list:
-            for sensor_type in UNIT_SENSOR_TYPES:
-                sensors.append(
-                    NavienUnitSensor(
-                        coordinator,
-                        channel,
-                        unit_info,
-                        sensor_type,
-                        get_description(hass_units, navien_units, sensor_type),
-                    )
-                )
-    async_add_entities(sensors)
+    entities: list[SensorEntity] = []
+    for channel in coordinator.data.channels.values():
+        entities.extend(
+            NavienChannelSensor(coordinator, channel.number, desc)
+            for desc in CHANNEL_SENSORS
+        )
+        for unit in channel.units:
+            unit_number = unit.get("unitNumber")
+            entities.extend(
+                NavienUnitSensor(coordinator, channel.number, unit_number, desc)
+                for desc in UNIT_SENSORS
+            )
+    async_add_entities(entities)
 
 
-class NavienHeatingPowerSensor(NavienChannelEntity, SensorEntity):
-    """Average heating power (avgCalorie) for a channel."""
-
-    _attr_name = "Heating power"
-    _attr_device_class = SensorDeviceClass.POWER_FACTOR
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = PERCENTAGE
+class _NavienUnitMixin:
+    """Shared imperial/metric unit resolution."""
 
     @property
-    def unique_id(self) -> str:
-        """Return a stable unique id."""
-        return f"{self._mac}{self.channel.channel_number}avgCalorie"
+    def native_unit_of_measurement(self) -> str | None:
+        """Return the unit, following the channel's temperatureType system."""
+        desc = self.entity_description
+        if desc.unit_imperial is None and desc.unit_metric is None:
+            return desc.native_unit_of_measurement
+        fahrenheit = (
+            self._channel.info.get("temperatureType")
+            == TemperatureType.FAHRENHEIT.value
+        )
+        return desc.unit_imperial if fahrenheit else desc.unit_metric
 
-    @property
-    def native_value(self) -> StateType:
-        """Return the average heating power."""
-        return self.channel.channel_status.get("avgCalorie", 0)
 
+class NavienChannelSensor(_NavienUnitMixin, NavienChannelEntity, SensorEntity):
+    """A channel-level sensor."""
 
-class NavienUnitSensor(NavienChannelEntity, SensorEntity):
-    """A per-unit measurement (temp / flow / gas) for a channel."""
+    entity_description: NavienChannelSensorEntityDescription
 
-    def __init__(self, coordinator, channel, unit_info, sensor_type, description) -> None:
-        """Initialize the per-unit sensor."""
-        super().__init__(coordinator, channel)
-        self.unit_info = unit_info
-        self.sensor_type = sensor_type
-        self.description = description
-        self.unit_number = unit_info.get("unitNumber", "")
-
-    async def async_added_to_hass(self) -> None:
-        """Subscribe with a refresh-then-write callback."""
-        self.channel.register_callback(self._handle_update)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Unsubscribe the refresh callback."""
-        self.channel.deregister_callback(self._handle_update)
-
-    def _handle_update(self) -> None:
-        """Refresh cached unit_info / description, then write state."""
-        hass_units, navien_units = _unit_systems(self.hass, self.channel)
-        for unit_info in self.channel.channel_status.get("unitInfo", {}).get(
-            "unitStatusList", []
-        ):
-            if unit_info.get("unitNumber", "") == self.unit_number:
-                self.unit_info = unit_info
-        self.description = get_description(hass_units, navien_units, self.sensor_type)
-        self.async_write_ha_state()
-
-    @property
-    def name(self) -> str:
-        """Return a unit-qualified entity name."""
-        if self.unit_number:
-            return f"Unit {self.unit_number} {self.description.name}"
-        return self.description.name
-
-    @property
-    def unique_id(self) -> str:
-        """Return a stable unique id."""
-        return (
-            f"{self._mac}{self.channel.channel_number}"
-            f"{self.unit_info.get('unitNumber', '')}{self.sensor_type}"
+    def __init__(
+        self,
+        coordinator,
+        channel_number: int,
+        description: NavienChannelSensorEntityDescription,
+    ) -> None:
+        """Initialize the channel sensor."""
+        super().__init__(coordinator, channel_number)
+        self.entity_description = description
+        self._attr_unique_id = (
+            f"{coordinator.gateway_mac}_{channel_number}_{description.key}"
         )
 
     @property
-    def device_class(self) -> SensorDeviceClass | None:
-        """Return the sensor device class."""
-        return self.description.device_class
+    def native_value(self) -> StateType:
+        """Return the sensor value."""
+        return self.entity_description.value_fn(self._channel)
 
-    @property
-    def state_class(self) -> SensorStateClass:
-        """Return the sensor state class."""
-        return self.description.state_class
 
-    @property
-    def native_unit_of_measurement(self) -> str:
-        """Return the native unit of measurement."""
-        return self.description.native_unit_of_measurement
+class NavienUnitSensor(_NavienUnitMixin, NavienChannelEntity, SensorEntity):
+    """A per-unit sensor (supports cascade installations)."""
+
+    entity_description: NavienUnitSensorEntityDescription
+
+    def __init__(
+        self,
+        coordinator,
+        channel_number: int,
+        unit_number: int | None,
+        description: NavienUnitSensorEntityDescription,
+    ) -> None:
+        """Initialize the per-unit sensor."""
+        super().__init__(coordinator, channel_number)
+        self._unit_number = unit_number
+        self.entity_description = description
+        self._attr_unique_id = (
+            f"{coordinator.gateway_mac}_{channel_number}_{unit_number}_{description.key}"
+        )
 
     @property
     def native_value(self) -> StateType:
-        """Return the converted measured value."""
-        return self.description.convert(self.unit_info.get(self.sensor_type, 0))
+        """Return the sensor value for this unit."""
+        return self.entity_description.value_fn(self._channel.unit(self._unit_number))

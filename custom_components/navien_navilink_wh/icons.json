@@ -1,0 +1,26 @@
+{
+  "entity": {
+    "sensor": {
+      "heating_power": { "default": "mdi:fire" },
+      "hot_water_temp": { "default": "mdi:thermometer-water" },
+      "inlet_temp": { "default": "mdi:thermometer" },
+      "flow_rate": { "default": "mdi:water-pump" },
+      "gas_current": { "default": "mdi:gas-burner" },
+      "gas_cumulative": { "default": "mdi:meter-gas" },
+      "recirculation_temp": { "default": "mdi:pump" },
+      "water_use_count": { "default": "mdi:counter" },
+      "days_filter_used": { "default": "mdi:air-filter" },
+      "error_code": { "default": "mdi:alert-circle" },
+      "controller_version": { "default": "mdi:chip" },
+      "panel_version": { "default": "mdi:chip" }
+    },
+    "binary_sensor": {
+      "fault": { "default": "mdi:alert" },
+      "freeze_protection": { "default": "mdi:snowflake" }
+    },
+    "switch": {
+      "power": { "default": "mdi:power" },
+      "hot_button": { "default": "mdi:water-boiler" }
+    }
+  }
+}
