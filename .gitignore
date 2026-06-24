@@ -22,3 +22,6 @@ htmlcov/
 
 # Tooling state
 .cc-sessions/
+
+# Local Claude session state
+.claude/
