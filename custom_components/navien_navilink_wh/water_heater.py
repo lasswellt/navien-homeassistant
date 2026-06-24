@@ -12,8 +12,10 @@ from homeassistant.components.water_heater import (
 )
 from homeassistant.const import ATTR_TEMPERATURE, STATE_OFF, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import DOMAIN
 from .coordinator import NavienConfigEntry
 from .entity import NavienChannelEntity
 from .navien_api import TemperatureType
@@ -104,27 +106,39 @@ class NavienWaterHeater(NavienChannelEntity, WaterHeaterEntity):
         target = kwargs.get(ATTR_TEMPERATURE)
         if target is None:
             return
+        if not self.min_temp <= target <= self.max_temp:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="temp_out_of_range",
+                translation_placeholders={
+                    "temp": str(target),
+                    "min": str(self.min_temp),
+                    "max": str(self.max_temp),
+                },
+            )
         # NaviLink expects Celsius in half-degree steps; Fahrenheit is 1:1.
         if self.temperature_unit == UnitOfTemperature.CELSIUS:
             target = round(2 * target)
-        await self.coordinator.channel_client(self._channel_number).set_temperature(
-            target
+        await self.coordinator.async_send_command(
+            self.coordinator.channel_client(self._channel_number).set_temperature(target)
         )
 
     async def async_turn_away_mode_on(self) -> None:
         """Power the heater off (enter away mode)."""
-        await self.coordinator.channel_client(self._channel_number).set_power_state(
-            False
+        await self.coordinator.async_send_command(
+            self.coordinator.channel_client(self._channel_number).set_power_state(False)
         )
 
     async def async_turn_away_mode_off(self) -> None:
         """Power the heater on (leave away mode)."""
-        await self.coordinator.channel_client(self._channel_number).set_power_state(
-            True
+        await self.coordinator.async_send_command(
+            self.coordinator.channel_client(self._channel_number).set_power_state(True)
         )
 
     async def async_set_operation_mode(self, operation_mode: str) -> None:
         """Map the operation mode to power state."""
-        await self.coordinator.channel_client(self._channel_number).set_power_state(
-            operation_mode == STATE_GAS
+        await self.coordinator.async_send_command(
+            self.coordinator.channel_client(self._channel_number).set_power_state(
+                operation_mode == STATE_GAS
+            )
         )

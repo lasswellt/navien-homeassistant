@@ -1,0 +1,93 @@
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: Integration provides no service actions.
+  appropriate-polling:
+    status: done
+    comment: |
+      Push-based. The NaviLink MQTT client polls on its own interval (configurable
+      option, 10-120s) and feeds the coordinator via async_set_updated_data.
+  brands:
+    status: exempt
+    comment: Custom (HACS) integration; brands assets are core-only.
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency:
+    status: done
+    comment: AWSIoTPythonSDK pinned in manifest; published on PyPI.
+  docs-actions:
+    status: exempt
+    comment: No service actions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: No service actions.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: done
+    comment: Handled by DataUpdateCoordinator availability logging.
+  parallel-updates: done
+  reauthentication-flow: done
+  test-coverage: done
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: Cloud account integration; devices are not locally discoverable.
+  discovery-update-info:
+    status: exempt
+    comment: No local discovery.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: One gateway device per config entry; no runtime device addition.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations: done
+  exception-translations: done
+  icon-translations: done
+  reconfiguration-flow: done
+  repair-issues: done
+  stale-devices:
+    status: exempt
+    comment: One gateway per config entry; removal is done by deleting the entry.
+
+  # Platinum
+  async-dependency:
+    status: todo
+    comment: |
+      Blocked. The vendored NaviLink transport uses AWSIoTPythonSDK, a blocking
+      client driven via run_in_executor. Reaching platinum requires replacing it
+      with a native-async MQTT client (aiomqtt + AWS-IoT SigV4 websocket auth).
+  inject-websession:
+    status: todo
+    comment: REST login creates its own aiohttp session; not yet injected.
+  strict-typing:
+    status: todo
+    comment: Vendored client is untyped; strict-typing registration is core-only.

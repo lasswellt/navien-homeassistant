@@ -17,7 +17,12 @@ from typing import Any
 import certifi
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+)
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -145,8 +150,34 @@ class NavienDataUpdateCoordinator(DataUpdateCoordinator[NavienData]):
         if not self.navilink.channels:
             raise ConfigEntryNotReady("NaviLink returned no channels for this gateway")
 
-        for channel in self.navilink.channels.values():
+        for number, channel in self.navilink.channels.items():
             channel.register_callback(self._handle_push)
+            self._check_model_support(number, channel.channel_info.get("unitType"))
+
+    def _check_model_support(self, number: int, unit_type: Any) -> None:
+        """Raise a repair issue when the unit type is not recognised."""
+        issue_id = f"unsupported_model_{self.config_entry.entry_id}_{number}"
+        if self.channel_model(number) is None:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="unsupported_model",
+                translation_placeholders={"unit_type": str(unit_type)},
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+
+    async def async_send_command(self, coro) -> None:
+        """Await a control coroutine, surfacing failures as a translated error."""
+        try:
+            await coro
+        except Exception as err:  # noqa: BLE001
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="command_failed"
+            ) from err
 
     async def _async_update_data(self) -> NavienData:
         """Return the current snapshot (also the initial first-refresh value)."""

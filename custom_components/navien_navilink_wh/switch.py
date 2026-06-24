@@ -85,12 +85,16 @@ class NavienSwitch(NavienChannelEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
-        await self.entity_description.set_fn(
-            self.coordinator.channel_client(self._channel_number), True
+        await self.coordinator.async_send_command(
+            self.entity_description.set_fn(
+                self.coordinator.channel_client(self._channel_number), True
+            )
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
-        await self.entity_description.set_fn(
-            self.coordinator.channel_client(self._channel_number), False
+        await self.coordinator.async_send_command(
+            self.entity_description.set_fn(
+                self.coordinator.channel_client(self._channel_number), False
+            )
         )

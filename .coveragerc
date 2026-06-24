@@ -1,0 +1,10 @@
+[run]
+source = custom_components/navien_navilink_wh
+omit =
+    # Vendored upstream NaviLink AWS-IoT client (third-party transport code).
+    custom_components/navien_navilink_wh/navien_api.py
+
+[report]
+exclude_also =
+    if TYPE_CHECKING:
+    raise NotImplementedError

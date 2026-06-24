@@ -23,6 +23,21 @@
           "username": "Username (email)",
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Navien NaviLink",
+        "description": "Update the credentials for this NaviLink gateway.",
+        "data": {
+          "username": "Username (email)",
+          "password": "Password"
+        }
+      },
+      "reconfigure_pick": {
+        "title": "Confirm gateway",
+        "description": "Confirm the gateway for this entry.",
+        "data": {
+          "device_index": "Gateway"
+        }
       }
     },
     "error": {
@@ -30,7 +45,9 @@
     },
     "abort": {
       "already_configured": "This gateway is already configured.",
-      "reauth_successful": "Re-authentication was successful."
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_successful": "Reconfiguration was successful.",
+      "unique_id_mismatch": "The selected gateway does not match this entry. Pick the same gateway, or add it as a new integration."
     }
   },
   "options": {
@@ -41,6 +58,20 @@
           "polling_interval": "Polling interval (seconds)"
         }
       }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "Failed to send the command to the water heater. Check the connection and try again."
+    },
+    "temp_out_of_range": {
+      "message": "Target temperature {temp} is outside the allowed range {min}–{max}."
+    }
+  },
+  "issues": {
+    "unsupported_model": {
+      "title": "Unsupported Navien model",
+      "description": "This NaviLink unit type ({unit_type}) is not recognised. Basic controls may work, but some entities could be missing or incorrect. Please open an issue with your model number so support can be added."
     }
   },
   "entity": {
