@@ -43,6 +43,8 @@ async def async_get_config_entry_diagnostics(
             "options": dict(entry.options),
         },
         "device_info": async_redact_data(data.device_info, TO_REDACT),
+        "device_status": async_redact_data(data.device_status, TO_REDACT),
+        "connected": data.connected,
         "channels": {
             str(number): {
                 "info": async_redact_data(channel.info, TO_REDACT),

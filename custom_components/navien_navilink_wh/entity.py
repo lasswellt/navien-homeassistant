@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import (
+    CONNECTION_NETWORK_MAC,
+    DeviceInfo,
+    format_mac,
+)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, MANUFACTURER
@@ -26,6 +30,12 @@ class NavienChannelEntity(CoordinatorEntity[NavienDataUpdateCoordinator]):
             manufacturer=MANUFACTURER,
             model=coordinator.channel_model(channel_number),
             name=f"{coordinator.gateway_name} CH{channel_number}",
+            sw_version=coordinator.gateway_sw_version,
+            connections=(
+                {(CONNECTION_NETWORK_MAC, format_mac(mac))}
+                if mac != "unknown"
+                else set()
+            ),
         )
 
     @property

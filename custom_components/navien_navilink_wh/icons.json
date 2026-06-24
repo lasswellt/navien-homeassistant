@@ -1,26 +1,160 @@
 {
   "entity": {
     "sensor": {
-      "heating_power": { "default": "mdi:fire" },
-      "hot_water_temp": { "default": "mdi:thermometer-water" },
-      "inlet_temp": { "default": "mdi:thermometer" },
-      "flow_rate": { "default": "mdi:water-pump" },
-      "gas_current": { "default": "mdi:gas-burner" },
-      "gas_cumulative": { "default": "mdi:meter-gas" },
-      "recirculation_temp": { "default": "mdi:pump" },
-      "water_use_count": { "default": "mdi:counter" },
-      "days_filter_used": { "default": "mdi:air-filter" },
-      "error_code": { "default": "mdi:alert-circle" },
-      "controller_version": { "default": "mdi:chip" },
-      "panel_version": { "default": "mdi:chip" }
+      "heating_power": {
+        "default": "mdi:fire"
+      },
+      "hot_water_temp": {
+        "default": "mdi:thermometer-water"
+      },
+      "inlet_temp": {
+        "default": "mdi:thermometer"
+      },
+      "flow_rate": {
+        "default": "mdi:water-pump"
+      },
+      "gas_current": {
+        "default": "mdi:gas-burner"
+      },
+      "gas_cumulative": {
+        "default": "mdi:meter-gas"
+      },
+      "recirculation_temp": {
+        "default": "mdi:pump"
+      },
+      "water_use_count": {
+        "default": "mdi:counter"
+      },
+      "days_filter_used": {
+        "default": "mdi:air-filter"
+      },
+      "error_code": {
+        "default": "mdi:alert-circle"
+      },
+      "controller_version": {
+        "default": "mdi:chip"
+      },
+      "panel_version": {
+        "default": "mdi:chip"
+      },
+      "avg_supply_temp": {
+        "default": "mdi:thermometer"
+      },
+      "avg_return_temp": {
+        "default": "mdi:thermometer"
+      },
+      "recirculation_setting_temp": {
+        "default": "mdi:thermometer-lines"
+      },
+      "outdoor_temp": {
+        "default": "mdi:home-thermometer-outline"
+      },
+      "heat_setting_temp": {
+        "default": "mdi:thermometer"
+      },
+      "dhw_tank_setting_temp": {
+        "default": "mdi:thermometer"
+      },
+      "operation_unit_count": {
+        "default": "mdi:counter"
+      },
+      "heat_status": {
+        "default": "mdi:radiator"
+      },
+      "weekly_control": {
+        "default": "mdi:calendar-clock"
+      },
+      "water_cumulative": {
+        "default": "mdi:water"
+      },
+      "supply_temp": {
+        "default": "mdi:thermometer"
+      },
+      "return_temp": {
+        "default": "mdi:thermometer"
+      },
+      "dhw_tank_temp": {
+        "default": "mdi:thermometer"
+      },
+      "supply_air_temp": {
+        "default": "mdi:thermometer"
+      },
+      "return_air_temp": {
+        "default": "mdi:thermometer"
+      },
+      "heat_flow_rate": {
+        "default": "mdi:water-pump"
+      },
+      "short_water_use_count": {
+        "default": "mdi:counter"
+      },
+      "operation_mode": {
+        "default": "mdi:cog"
+      },
+      "sub_error_code": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "thermostat_status": {
+        "default": "mdi:thermostat"
+      },
+      "water_level": {
+        "default": "mdi:water-percent"
+      },
+      "blower_cfm": {
+        "default": "mdi:fan"
+      },
+      "tds_value": {
+        "default": "mdi:water-opacity"
+      },
+      "filter_status": {
+        "default": "mdi:air-filter"
+      },
+      "poe_status": {
+        "default": "mdi:ethernet"
+      },
+      "cip_status": {
+        "default": "mdi:dishwasher"
+      },
+      "cip_solution_remained": {
+        "default": "mdi:cup-water"
+      },
+      "cip_operation_hour": {
+        "default": "mdi:timer"
+      },
+      "cip_operation_min": {
+        "default": "mdi:timer"
+      },
+      "wifi_signal": {
+        "default": "mdi:wifi"
+      },
+      "country_code": {
+        "default": "mdi:earth"
+      },
+      "descaling_start": {
+        "default": "mdi:calendar-start"
+      },
+      "descaling_end": {
+        "default": "mdi:calendar-end"
+      }
     },
     "binary_sensor": {
-      "fault": { "default": "mdi:alert" },
-      "freeze_protection": { "default": "mdi:snowflake" }
+      "fault": {
+        "default": "mdi:alert"
+      },
+      "freeze_protection": {
+        "default": "mdi:snowflake"
+      },
+      "connection": {
+        "default": "mdi:cloud-check"
+      }
     },
     "switch": {
-      "power": { "default": "mdi:power" },
-      "hot_button": { "default": "mdi:water-boiler" }
+      "power": {
+        "default": "mdi:power"
+      },
+      "hot_button": {
+        "default": "mdi:water-boiler"
+      }
     }
   }
 }

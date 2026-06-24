@@ -33,6 +33,7 @@ class NavilinkConnect():
         self.shutting_down = False
         self.user_info = None
         self.device_info = None
+        self.device_status = {}
         self.client = None
         self.client_id = ""
         self.topics = None
@@ -333,7 +334,11 @@ class NavilinkConnect():
 
     def async_handle_channel_status(self, client, userdata, message):
         response = json.loads(message.payload)
-        channel_status = response.get("response",{}).get("channelStatus",{})
+        device_response = response.get("response",{})
+        # Retain device-level fields (swVersion, wifiRssi, countryCode) that are
+        # otherwise discarded; consumed by the HA integration for diagnostics.
+        self.device_status = {k: v for k, v in device_response.items() if k != "channelStatus"}
+        channel_status = device_response.get("channelStatus",{})
         session_id = response.get("sessionID","unknown")
         if channel := self.channels.get(channel_status.get("channelNumber",0),None):
             channel.update_channel_status(channel_status.get("channel",{}))

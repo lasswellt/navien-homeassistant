@@ -74,6 +74,8 @@ class NavienData:
     """Immutable snapshot of the whole gateway for one coordinator update."""
 
     device_info: dict[str, Any]
+    device_status: dict[str, Any] = field(default_factory=dict)
+    connected: bool = False
     channels: dict[int, NavienChannelData] = field(default_factory=dict)
 
 
@@ -190,10 +192,18 @@ class NavienDataUpdateCoordinator(DataUpdateCoordinator[NavienData]):
         """Rebuild the snapshot when the push client reports new status."""
         self.async_set_updated_data(self._build_snapshot())
 
+    @property
+    def gateway_sw_version(self) -> str | None:
+        """Return the gateway firmware version, if captured."""
+        version = (self.navilink.device_status or {}).get("swVersion")
+        return str(version) if version is not None else None
+
     def _build_snapshot(self) -> NavienData:
         """Construct an immutable snapshot from the live client state."""
         return NavienData(
             device_info=self.navilink.device_info or {},
+            device_status=dict(self.navilink.device_status or {}),
+            connected=bool(self.navilink.connected),
             channels={
                 number: NavienChannelData(
                     number=number,

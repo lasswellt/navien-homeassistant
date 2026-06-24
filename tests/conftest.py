@@ -109,6 +109,8 @@ class MockNavilink:
     def __init__(self, *args, **kwargs) -> None:
         """Initialize with no connection."""
         self.device_info: dict | None = None
+        self.device_status: dict = {}
+        self.connected: bool = False
         self.channels: dict[int, MockChannel] = {}
 
     async def login(self) -> list[dict]:
@@ -118,7 +120,15 @@ class MockNavilink:
 
     async def start(self) -> None:
         """Connect and discover one channel."""
-        self.device_info = DEVICE_LIST[0]
+        self.device_info = {
+            **DEVICE_LIST[0],
+            "descaling": {
+                "descalingStartTime": "2026-06-01T00:00:00",
+                "descalingEndTime": "2027-06-01T00:00:00",
+            },
+        }
+        self.device_status = {"swVersion": 4352, "wifiRssi": -55, "countryCode": 1}
+        self.connected = True
         self.channels = {1: MockChannel(1)}
 
     async def disconnect(self) -> None:
